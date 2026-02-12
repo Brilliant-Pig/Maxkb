@@ -130,3 +130,17 @@ exports.getStudentStatus = async () => {
     const sql = `SELECT * FROM student_status ORDER BY last_active DESC`;
     return await db.query(sql);
 };
+
+// userDao.js 中增加以下两个导出函数
+
+// 根据核心词进行模糊匹配
+exports.getQuestionsByContent = async (core) => {
+    const sql = `SELECT id, hot_score FROM student_questions WHERE content LIKE ? LIMIT 1`;
+    return await db.query(sql, [`%${core}%`]);
+};
+
+// 增加热度值
+exports.updateQuestionHot = async (id) => {
+    const sql = `UPDATE student_questions SET hot_score = hot_score + 1 WHERE id = ?`;
+    return await db.query(sql, [id]);
+};
