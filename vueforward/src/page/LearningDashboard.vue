@@ -100,7 +100,7 @@
             <div v-for="faq in dynamicFaqList" :key="faq.id" class="faq-card" :class="{ 'is-student': faq.isStudent }">
               <div class="faq-header">
                 <span class="faq-tag">{{ faq.isStudent ? '我的提问' : '热点点击' }}</span>
-                <div v-if="faq.isStudent && canModify(faq.id)" class="faq-actions">
+                <div v-if="faq.isStudent" class="faq-actions">
                   <button @click="editQuestion(faq)" class="act-btn edit">🖊️</button>
                   <button @click="deleteQuestion(faq.id)" class="act-btn del">🗑️</button>
                 </div>
@@ -109,7 +109,7 @@
               <p class="faq-ans">{{ faq.answer }}</p>
               <div class="faq-footer">
                 <span class="hot-val">🔥 热度: {{ faq.hot }}</span>
-                <span v-if="faq.isStudent" class="time-limit">有效期至: {{ getExpiryDate(faq.id) }}</span>
+                <span v-if="faq.isStudent" class="time-limit">记录时间: {{ new Date().toLocaleDateString('zh-CN') }}</span>
               </div>
             </div>
           </div>
@@ -121,47 +121,117 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import axios from 'axios'; // 导入 axios
+
+// 配置后端基础地址
+const API_BASE = 'http://127.0.0.1:33001/api/user';
 
 const activeTab = ref('efficacy');
 const progress = ref(0);
 const newQuestion = ref('');
-
-// --- 核心修改：将数据转为响应式 ref ---
 const studentQuestions = ref([]);
 const systemHotTopics = ref([]);
 
-const efficacyItems = ["理解 OS 虚拟内存等难点", "掌握核心概念和原理", "有信心在考试中取得佳绩", "无需指导也能通过自学掌握", "能解决 OS 相关的编程模拟", "能清晰解释 PV 操作等机制", "AI 助手提升了我的学习信心", "有能力克服理解上的困难", "将理论应用到实际系统开发"];
-const susItems = ["我愿意经常使用该系统", "我发现系统设计并不复杂", "系统非常易于使用", "我不需要技术人员支持就能用", "各项功能整合得非常到位", "我发现系统存在很多不一致性", "大部分人能很快学会使用", "我感觉系统操作起来很笨拙", "使用该系统时我感到很自信", "我需要学习很多背景知识才能用"];
+// 模拟当前登录的学生ID (实际开发中应从登录系统获取)
+const currentStudentId = 'STUD001'; 
 
-const effAnswers = ref(new Array(9).fill(0));
-const susAnswers = ref(new Array(10).fill(3));
+// 初始化：从后端数据库读取所有数据
+onMounted(async () => {
+  try {
+    // 1. 获取所有问题列表 (包含学生提问和热点)
+    const res = await axios.get(`${API_BASE}/getQuestions`);
+    if (res.data.code === 0) {
+      // 后端返回的数据已带 isStudent 标识
+      const allData = res.data.data;
+      studentQuestions.value = allData.filter(item => item.isStudent === 1);
+      systemHotTopics.value = allData.filter(item => item.isStudent === 0);
+    }
+  } catch (error) {
+    console.error("初始化失败，请检查后端是否开启:", error);
+  }
+});
 
-// 计算掌握度逻辑
-const calculateProgress = () => {
-  const answered = effAnswers.value.filter(v => v > 0);
-  if (answered.length === 0) return;
-  const avg = answered.reduce((a, b) => a + b, 0) / answered.length;
-  progress.value = Math.round((avg / 5) * 100);
+// 提交新提问：彻底废弃 localStorage，直接入库
+const submitNewQuestion = async () => {
+  if (!newQuestion.value.trim()) return;
+  
+  try {
+    const res = await axios.post(`${API_BASE}/addQuestion`, {
+      studentId: currentStudentId,
+      content: newQuestion.value
+    });
+    
+    if (res.data.code === 0) {
+      // 提交成功后重新拉取列表，保证数据同步
+      const refreshRes = await axios.get(`${API_BASE}/getQuestions`);
+      const allData = refreshRes.data.data;
+      studentQuestions.value = allData.filter(item => item.isStudent === 1);
+      newQuestion.value = '';
+    }
+  } catch (error) {
+    alert("提交失败，请检查网络连接");
+  }
 };
 
-// 初始化：将所有本地存储读入响应式变量
-onMounted(() => {
-  // 1. 读取学生问题
-  studentQuestions.value = JSON.parse(localStorage.getItem('os_student_questions') || '[]');
+// 物理删除：调用后端 DELETE 接口，实现“彻底消失”
+const deleteQuestion = async (id) => {
+  if (!confirm("确定要永久删除这个问题吗？数据将从服务器同步抹除。")) return;
   
-  // 2. 读取热点数据 (这就是“问题1”所在的地方)
-  const clickData = JSON.parse(localStorage.getItem('os_topic_clicks') || '{}');
-  systemHotTopics.value = Object.keys(clickData).map(topic => ({
-    id: topic,
-    question: topic,
-    hot: clickData[topic],
-    isStudent: false,
-    answer: "点击实验室快捷键可获取此考点的详细 AI 回答。"
-  }));
+  try {
+    // 根据是学生提问还是系统热点传递 type (对应你 userController 的逻辑)
+    const res = await axios.delete(`${API_BASE}/deleteQuestion`, {
+      params: { id: id, type: 'question' }
+    });
+    
+    if (res.data.code === 0) {
+      // 过滤掉本地显示的这一行
+      studentQuestions.value = studentQuestions.value.filter(q => q.id !== id);
+    }
+  } catch (error) {
+    alert("删除操作失败");
+  }
+};
 
-  const savedEff = localStorage.getItem('os_survey_efficacy');
-  if (savedEff) { effAnswers.value = JSON.parse(savedEff); calculateProgress(); }
-});
+// 保存效能感测评：计算后同步至后端
+const saveEfficacy = async () => {
+  try {
+    const res = await axios.post(`${API_BASE}/submitEfficacy`, {
+      studentId: currentStudentId,
+      q1: effAnswers.value[0], q2: effAnswers.value[1], q3: effAnswers.value[2],
+      q4: effAnswers.value[3], q5: effAnswers.value[4], q6: effAnswers.value[5],
+      q7: effAnswers.value[6], q8: effAnswers.value[7], q9: effAnswers.value[8]
+    });
+    if (res.data.code === 0) {
+      // 新增计算逻辑：
+      const sum = effAnswers.value.reduce((a, b) => a + Number(b), 0);
+      progress.value = Math.round((sum / 45) * 100); 
+
+      alert("掌握度数据已同步至服务器存档。");
+    }
+  } catch (error) {
+    alert("保存失败");
+  }
+};
+
+// 提交 SUS 评价
+const calculateSUS = async () => {
+  let total = 0;
+  susAnswers.value.forEach((v, i) => {
+    total += ((i + 1) % 2 !== 0) ? (v - 1) : (5 - v);
+  });
+  const score = total * 2.5;
+
+  try {
+    await axios.post(`${API_BASE}/submitSus`, {
+      studentId: currentStudentId,
+      susScore: score,
+      rawAnswers: susAnswers.value
+    });
+    alert(`系统评价已提交，得分: ${score}，感谢反馈！`);
+  } catch (error) {
+    alert("评价提交失败");
+  }
+};
 
 // 计算属性：自动合并并过滤脏数据
 const dynamicFaqList = computed(() => {
@@ -180,53 +250,58 @@ const getExpiryDate = (timestamp) => {
   return new Date(timestamp + 7 * 24 * 60 * 60 * 1000).toLocaleDateString();
 };
 
-const submitNewQuestion = () => {
-  if (!newQuestion.value.trim()) return;
-  const newItem = {
-    id: Date.now(),
-    question: newQuestion.value,
-    hot: 1,
-    isStudent: true,
-    answer: "老师正在审阅，解析将在稍后同步。"
-  };
-  studentQuestions.value.unshift(newItem);
-  localStorage.setItem('os_student_questions', JSON.stringify(studentQuestions.value));
-  newQuestion.value = '';
-};
-
-// 彻底修复：点击删除时同时清理内存和存储
-const deleteQuestion = (id) => {
-  if (!confirm("确定要删除这个问题吗？")) return;
-  
-  // 1. 更新学生问题列表
-  studentQuestions.value = studentQuestions.value.filter(q => q.id !== id);
-  localStorage.setItem('os_student_questions', JSON.stringify(studentQuestions.value));
-};
-
-const editQuestion = (faq) => {
+const editQuestion = async (faq) => {
   const updated = prompt("修改你的问题：", faq.question);
   if (updated && updated.trim()) {
-    const index = studentQuestions.value.findIndex(q => q.id === faq.id);
-    if (index !== -1) {
-      studentQuestions.value[index].question = updated;
-      localStorage.setItem('os_student_questions', JSON.stringify(studentQuestions.value));
+    try {
+      // 这里的 API 路径必须对应你后端 controller 定义的更新接口
+      const res = await axios.put(`${API_BASE}/updateQuestion`, {
+        id: faq.id,      // 数据库中的自增 ID
+        content: updated // 修改后的内容
+      });
+
+      if (res.data.code === 0) {
+        // 成功后重新拉取数据，确保界面和数据库完全一致
+        const refreshRes = await axios.get(`${API_BASE}/getQuestions`);
+        const allData = refreshRes.data.data;
+        studentQuestions.value = allData.filter(item => item.isStudent === 1);
+        alert("问题已成功同步至数据库");
+      }
+    } catch (error) {
+      console.error("修改失败:", error);
+      alert("同步修改到服务器失败，请检查网络");
     }
   }
 };
 
-const saveEfficacy = () => {
-  localStorage.setItem('os_survey_efficacy', JSON.stringify(effAnswers.value));
-  alert("自评已存档，掌握度已同步更新。");
-};
+// 初始化 effAnswers 和 susAnswers
+const effAnswers = ref([0, 0, 0, 0, 0, 0, 0, 0, 0]);
+const susAnswers = ref([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
 
-const calculateSUS = () => {
-  let total = 0;
-  susAnswers.value.forEach((v, i) => {
-    total += ((i + 1) % 2 !== 0) ? (v - 1) : (5 - v);
-  });
-  localStorage.setItem('os_survey_sus_score', total * 2.5);
-  alert("系统评价已提交，感谢反馈！");
-};
+const efficacyItems = [
+  "我认为学完这套系统的内容后，能够自主完成 OS 作业。",
+  "遇到操作系统问题时，我有信心通过系统提供的学习资料自行解决。",
+  "我认为自己的 OS 理论基础已达到可上手项目的水平。",
+  "使用本系统学习让我对 OS 核心概念的理解更深入。",
+  "我相信通过继续学习本系统内容，能够提升我的编程实战能力。",
+  "本系统的 AI 反馈帮助我找到了学习中的薄弱环节。",
+  "我对自己在考试中的表现有信心。",
+  "我认为本系统的教学方式适合我的学习风格。",
+  "学完后我会主动应用所学知识到实际项目中。"
+];
+
+const susItems = [
+  "我觉得经常会使用这个系统。",
+  "我觉得这个系统不必要地复杂。",
+  "我觉得这个系统很容易使用。",
+  "我觉得需要技术支持人员的帮助才能使用这个系统。",
+  "我觉得这个系统中各种功能配合得很好。",
+  "我觉得这个系统中有很多不一致的地方。",
+  "我想大多数人会很快学会使用这个系统。",
+  "我觉得这个系统用起来很笨重。",
+  "使用这个系统时我感到很自信。",
+  "我需要学习很多东西才能开始使用这个系统。"
+];
 </script>
 
 <style scoped>
@@ -243,7 +318,12 @@ const calculateSUS = () => {
 .nav-menu { display: flex; flex-direction: column; gap: 12px; }
 .nav-menu button { display: flex; align-items: center; gap: 12px; padding: 16px; background: transparent; border: 1px solid transparent; border-radius: 12px; color: #94a3b8; font-weight: 600; cursor: pointer; transition: all 0.2s; }
 .nav-menu button.active { background: rgba(59, 130, 246, 0.1); border-color: #3b82f6; color: white; }
-.content-area { flex: 1; padding: 50px; overflow-y: auto; }
+.content-area {
+  flex: 1;
+  padding: 50px;
+  padding-bottom: 120px; /* 重点：增加底部留白 */
+  overflow-y: auto;
+}
 .section-title { margin-bottom: 40px; }
 .section-title h3 { font-size: 1.8rem; font-weight: 800; margin-bottom: 8px; }
 .subtitle { color: #64748b; font-size: 1rem; }
@@ -272,7 +352,12 @@ input:checked + .sus-dot { background: #3b82f6; }
 .act-btn:hover { opacity: 1; transform: scale(1.2); }
 .faq-ans { font-size: 0.9rem; color: #94a3b8; margin: 15px 0; min-height: 40px; }
 .faq-footer { display: flex; justify-content: space-between; font-size: 0.75rem; color: #64748b; }
-.action-footer { margin-top: 40px; display: flex; justify-content: flex-end; }
+.action-footer {
+  margin-top: 40px;
+  margin-bottom: 60px; /* 重点：把按钮往上顶 */
+  display: flex;
+  justify-content: flex-end;
+}
 .save-btn { background: #3b82f6; color: white; border: none; padding: 18px 40px; border-radius: 12px; font-size: 1.1rem; font-weight: bold; cursor: pointer; box-shadow: 0 10px 20px rgba(59, 130, 246, 0.2); }
 .fade-transform-enter-active, .fade-transform-leave-active { transition: all 0.4s ease; }
 .fade-transform-enter-from { opacity: 0; transform: translateY(20px); }
