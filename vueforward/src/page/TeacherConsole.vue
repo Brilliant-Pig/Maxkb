@@ -131,6 +131,16 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import axios from 'axios'; // 确保安装了 axios: npm install axios
+import { useRouter } from 'vue-router';
+
+const router = useRouter();
+
+onMounted(() => {
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (!user || user.role !== 'teacher') {
+        router.push('/login');
+    }
+});
 
 const activeMenu = ref('data');
 const menuItems = [
