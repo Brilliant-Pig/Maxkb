@@ -6,3 +6,6 @@ const provider = db_conf.provider;
 const db = require(`./${provider}`);
 
 module.exports = db;
+const path = require('path');
+// 假设你的 dbConfig.filename 是数据库路径
+console.log('当前正在使用的数据库绝对路径是:', path.resolve(db_conf.filename));
