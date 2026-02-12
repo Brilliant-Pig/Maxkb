@@ -3,18 +3,31 @@ const db_conf = require('config').get('dbConfig');
 // 打开数据库文件
 const sqlite = require('better-sqlite3');
 const dbFile = new sqlite(db_conf.filename, {
-    readonly: false, // 以只读模式打开数据库连接
-    fileMustExist: false, // 如果数据库不存在，将抛出异常而不是创建新文件
-    verbose: console.log // 提供一个函数，该函数与数据库连接执行的每个 SQL 字符串一起调用
+    readonly: false,
+    fileMustExist: false,
+    verbose: console.log
 });
 
 // 封装 SQL 执行的方法
 exports.query = async (sql, sqlParams) => {
     try {
         const stmt = dbFile.prepare(sql);
-        const result = sqlParams ? stmt.all(sqlParams) : stmt.all();
-        return result;
+
+        // --- 核心修复：判断是查询还是写入 ---
+        // 检查 SQL 语句是否以 SELECT 开头（忽略大小写和空格）
+        const isSelect = sql.trim().toUpperCase().startsWith('SELECT') || sql.trim().toUpperCase().startsWith('PRAGMA');
+
+        if (isSelect) {
+            // 查询操作：返回所有结果行
+            return sqlParams ? stmt.all(sqlParams) : stmt.all();
+        } else {
+            // 写入操作（INSERT/UPDATE/DELETE）：执行并返回受影响的信息
+            const info = sqlParams ? stmt.run(sqlParams) : stmt.run();
+            // better-sqlite3 的 run() 返回的是 { changes: 1, lastInsertRowid: 1 }
+            return info;
+        }
     } catch (err) {
+        console.error('数据库操作失败:', err);
         return err;
     }
 };
