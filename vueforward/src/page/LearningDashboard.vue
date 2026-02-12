@@ -162,14 +162,17 @@ const submitNewQuestion = async () => {
     });
     
     if (res.data.code === 0) {
-      // 提交成功后重新拉取列表，保证数据同步
+      // 关键：无论后端是新增还是加热度，都重新拉取数据刷新界面
       const refreshRes = await axios.get(`${API_BASE}/getQuestions`);
-      const allData = refreshRes.data.data;
-      studentQuestions.value = allData.filter(item => item.isStudent === 1);
-      newQuestion.value = '';
+      if (refreshRes.data.code === 0) {
+        const allData = refreshRes.data.data;
+        studentQuestions.value = allData.filter(item => item.isStudent === 1);
+        systemHotTopics.value = allData.filter(item => item.isStudent === 0);
+      }
+      newQuestion.value = ''; // 清空输入框
     }
   } catch (error) {
-    alert("提交失败，请检查网络连接");
+    alert("同步失败");
   }
 };
 

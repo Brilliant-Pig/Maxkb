@@ -1,6 +1,23 @@
 import { createRouter, createWebHistory } from 'vue-router';
 
 const routes = [
+    // 1. 刚进网站直接跳转到登录注册页
+    {
+        path: '/',
+        redirect: '/login'
+    },
+    {
+        path: '/login',
+        name: 'Login',
+        component: () => import('../page/auth.vue'),
+        meta: { title: '身份认证', freeAuth: true } // 标记不需要登录
+    },
+    {
+        path: '/TeacherConsole',
+        name: 'TeacherConsole',
+        component: () => import('../page/TeacherConsole.vue'),
+        meta: { title: '教师控制台', role: 'teacher' } // 标记只有教师可进
+    },
     {
         path: '/ImmersiveLab',
         name: 'ImmersiveLab',
@@ -44,32 +61,32 @@ const router = createRouter({
     routes
 });
 
-// // 升级版导航守卫（兼容原有逻辑，增加 Vuex 状态检查）
-// router.beforeEach((to, from, next) => {
-// // 1. 优先从 Vuex 读取 token（保持状态集中管理）
-// const isAuthenticated = store.getters.isAuthenticated;
+// --- 路由守卫：实现登录拦截和角色过滤 ---
+router.beforeEach((to, from, next) => {
+    // 从 localStorage 获取用户信息
+    const user = JSON.parse(localStorage.getItem('user'));
 
-// // 2. 兼容性回退：如果 Vuex 未启用，则从 localStorage 读取（逐步迁移用）
-// const fallbackToken = localStorage.getItem('token');
+    // 如果要去的是免登录页面（如 Login），直接放行
+    if (to.meta.freeAuth) {
+        return next();
+    }
 
-// // 3. 判断是否免认证页面
-// const isFreeAuth = to.matched.some(record => record.meta.freeAuth);
+    // 如果未登录，全部踢回登录页
+    if (!user || !user.token) {
+        return next({ name: 'Login' });
+    }
 
-//  // 4. 权限判断逻辑（优先级：Vuex > localStorage）
-// if (!isFreeAuth) {
-//     if (!isAuthenticated && !fallbackToken) {
-//     // 情况1：需要认证但未登录 → 跳登录页
-//         next({ name: 'login' });
-//         return;
-//     } else if (to.name === 'login' && (isAuthenticated || fallbackToken)) {
-//         // 情况2：已登录但访问登录页 → 跳首页
-//         next('/LotteryMain');
-//         return;
-//     }
-// }
-
-// // 5. 其他情况放行
-//     next();
-// });
+    // 如果要去教师端，检查角色
+    if (to.meta.role === 'teacher') {
+        if (user.role === 'teacher') {
+            next(); // 是老师，放行
+        } else {
+            alert('权限不足：学生无法进入教师管理后台');
+            next({ name: 'HomeworkAssistant' }); // 学生强制跳回作业助手
+        }
+    } else {
+        next(); // 其他页面正常放行
+    }
+});
 
 export default router;

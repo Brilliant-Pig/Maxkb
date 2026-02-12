@@ -5,12 +5,27 @@ const userDao = require('../dao/userDao');
 // ==========================================
 
 exports.getQuestions = async () => {
-    // 获取所有学生提问以及热点考点，用于前端 FAQ 列表展示
     return await userDao.getQuestions();
 };
 
-exports.addQuestion = async (questionData) => {
-    // 插入新提问，确保数据进入 SQLite 数据库
+// --- 新增：根据核心词查询 ---
+exports.getQuestionsByContent = async (core) => {
+    // 直接调用 dao 层执行模糊查询
+    return await userDao.getQuestionsByContent(core);
+};
+
+// --- 新增：增加问题热度 ---
+exports.updateQuestionHot = async (id) => {
+    return await userDao.updateQuestionHot(id);
+};
+
+// --- 修改：适配 controller 的调用参数 ---
+exports.addQuestion = async (studentId, content) => {
+    // 构造 dao 层需要的对象格式
+    const questionData = {
+        studentId: studentId,
+        content: content
+    };
     return await userDao.addQuestion(questionData);
 };
 

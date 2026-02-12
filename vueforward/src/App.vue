@@ -1,4 +1,7 @@
 <template>
+  <button v-if="userRole === 'teacher'" @click="goToAdmin">
+  进入教师管理后台
+  </button>
   <div id="app">
     <div class="particles-bg"></div>
 
@@ -39,6 +42,8 @@ import 'animate.css'
 
 const route = useRoute()
 const showNav = computed(() => route.name !== 'login')
+const user = JSON.parse(localStorage.getItem('user'));
+const userRole = user ? user.role : '';
 
 onMounted(() => {
   // --- 关键修改：建立页面间的联系逻辑 ---

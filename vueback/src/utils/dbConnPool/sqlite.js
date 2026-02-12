@@ -13,17 +13,15 @@ exports.query = async (sql, sqlParams) => {
     try {
         const stmt = dbFile.prepare(sql);
 
-        // --- 核心修复：判断是查询还是写入 ---
-        // 检查 SQL 语句是否以 SELECT 开头（忽略大小写和空格）
+        // 判断是否为查询语句
         const isSelect = sql.trim().toUpperCase().startsWith('SELECT') || sql.trim().toUpperCase().startsWith('PRAGMA');
 
         if (isSelect) {
-            // 查询操作：返回所有结果行
+            // 查询用 all()
             return sqlParams ? stmt.all(sqlParams) : stmt.all();
         } else {
-            // 写入操作（INSERT/UPDATE/DELETE）：执行并返回受影响的信息
+            // 写入/更新用 run()
             const info = sqlParams ? stmt.run(sqlParams) : stmt.run();
-            // better-sqlite3 的 run() 返回的是 { changes: 1, lastInsertRowid: 1 }
             return info;
         }
     } catch (err) {

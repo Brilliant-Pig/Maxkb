@@ -31,3 +31,8 @@ const server = app.listen(server_conf.port || 33001, server_conf.host || '127.0.
     console.log('Server running at http://%s:%s', server_conf.host, server_conf.port);
     console.log('Environment=%s', process.env.NODE_ENV);
 });
+// app.js
+const authController = require('./src/controller/authController'); // 路径根据你实际情况调整
+
+// 必须有这一行，且路径要匹配
+app.use('/api/auth', authController);

@@ -130,6 +130,17 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import axios from 'axios'; // 确保安装了 axios: npm install axios
+import { useRouter } from 'vue-router';
+
+const router = useRouter();
+
+onMounted(() => {
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (!user || user.role !== 'teacher') {
+        router.push('/login');
+    }
+});
 
 const activeMenu = ref('data');
 const menuItems = [
@@ -138,9 +149,52 @@ const menuItems = [
   { id: 'sys', name: '节点性能', icon: '🖥️' }
 ];
 
+// 响应式数据变量
 const knowledgeFiles = ref([]);
+const classEfficacy = ref('0');
+const classSus = ref('0');
+const avgTime = ref('0');
+const rawQuestions = ref([]); // 存储从后端拉取的原始问题数据
 
-// 1. 初始化并支持真实上传
+// 后端 API 基础路径 (需与后端端口一致)
+const API_BASE = 'http://127.0.0.1:33001/api/user';
+
+// 1. 从后端获取统计数据和问题列表
+const refreshStats = async () => {
+  try {
+    // A. 获取班级整体评价 (效能感、SUS、时长)
+    const statsRes = await axios.get(`${API_BASE}/getClassStats`);
+    if (statsRes.data.code === 0) {
+      const stats = statsRes.data.data;
+      classEfficacy.value = stats.avgEfficacy || '0';
+      classSus.value = stats.avgSus || '0';
+      avgTime.value = stats.avgTime || '0';
+    }
+
+    // B. 获取所有学生提问与系统热点
+    const qRes = await axios.get(`${API_BASE}/getQuestions`);
+    if (qRes.data.code === 0) {
+      rawQuestions.value = qRes.data.data;
+    }
+  } catch (error) {
+    console.error("教师端同步后端数据失败:", error);
+  }
+};
+
+// 2. 难题捕获逻辑：直接分析从后端拿到的 rawQuestions
+const realHotIssues = computed(() => {
+  if (!rawQuestions.value.length) return [];
+
+  return rawQuestions.value.map(item => ({
+    topic: item.question,
+    count: item.hot || 0,
+    // 进度条百分比，假设最高热度为10次点击
+    percent: Math.min((item.hot || 0) * 10, 100),
+    source: item.isStudent === 1 ? "学生自主提问" : "实验室热点点击"
+  })).sort((a, b) => b.count - a.count); // 按热度降序排列
+});
+
+// 3. 知识库上传逻辑 (暂时保持本地，或根据需要对接后端上传接口)
 const handleFileUpload = (event) => {
   const file = event.target.files[0];
   if (!file) return;
@@ -156,73 +210,39 @@ const handleFileUpload = (event) => {
   localStorage.setItem('os_kb_files', JSON.stringify(knowledgeFiles.value));
 };
 
-// 2. 统计真实数据
-const classEfficacy = ref('0');
-const classSus = ref('0');
-const avgTime = ref('0');
-
-const refreshStats = () => {
-  const eff = JSON.parse(localStorage.getItem('os_survey_efficacy') || '[]');
-  if (eff.length > 0) {
-    classEfficacy.value = (eff.reduce((a, b) => a + b, 0) / eff.length).toFixed(1);
-  }
-  classSus.value = localStorage.getItem('os_survey_sus_score') || '0';
-  avgTime.value = localStorage.getItem('os_total_study_minutes') || '0';
-};
-
-// 3. 真实难题捕获逻辑
-const realHotIssues = computed(() => {
-  const clickData = JSON.parse(localStorage.getItem('os_topic_clicks') || '{}');
-  const studentQs = JSON.parse(localStorage.getItem('os_student_questions') || '[]');
-  
-  const issues = [];
-  // 加入学生点击的考点
-  Object.keys(clickData).forEach(topic => {
-    issues.push({
-      topic: topic,
-      count: clickData[topic],
-      percent: Math.min(clickData[topic] * 10, 100),
-      source: "实验室热点点击"
-    });
-  });
-  // 加入学生自主提问
-  studentQs.forEach(q => {
-    issues.push({
-      topic: q.question,
-      count: 1,
-      percent: 20,
-      source: "学生自主提问"
-    });
-  });
-
-  return issues.sort((a, b) => b.count - a.count);
-});
-
-// 4. 科研数据一键导出
+// 4. 科研数据一键导出 (导出后端真实数据)
 const exportResearchData = () => {
-  const logs = JSON.parse(localStorage.getItem('os_chat_logs') || '[]');
-  const studentQs = JSON.parse(localStorage.getItem('os_student_questions') || '[]');
+  let csv = "\uFEFF维度,具体内容,热度/得分,来源,时间\n";
   
-  let csv = "\uFEFF维度,具体内容,数据值,时间戳\n";
-  logs.forEach(l => csv += `交互日志,${l.topic || l.type},${l.score || 'N/A'},${l.timestamp}\n`);
-  studentQs.forEach(q => csv += `学生提问,${q.question},主动发起,${new Date(q.id).toLocaleString()}\n`);
-  csv += `效能评估,平均分,${classEfficacy.value},${new Date().toLocaleDateString()}\n`;
-  csv += `系统评价,SUS得分,${classSus.value},${new Date().toLocaleDateString()}\n`;
-  csv += `学习时长,累计分钟,${avgTime.value},${new Date().toLocaleDateString()}\n`;
+  // 导出提问数据
+  rawQuestions.value.forEach(q => {
+    const type = q.isStudent === 1 ? '学生提问' : '热点考点';
+    csv += `${type},${q.question},${q.hot || 0},${q.isStudent ? '个人反馈' : '系统统计'},${new Date().toLocaleDateString()}\n`;
+  });
+
+  // 导出统计指标
+  csv += `效能评估,平均自我效能感,${classEfficacy.value},班级整体,${new Date().toLocaleDateString()}\n`;
+  csv += `系统评价,SUS可用性得分,${classSus.value},班级整体,${new Date().toLocaleDateString()}\n`;
 
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = `OS_Research_Report_${Date.now()}.csv`;
+  link.download = `OS_Research_Report_${new Date().toISOString().slice(0,10)}.csv`;
   link.click();
 };
 
 onMounted(() => {
+  // 初始化加载知识库文件清单
   const savedFiles = localStorage.getItem('os_kb_files');
   knowledgeFiles.value = savedFiles ? JSON.parse(savedFiles) : [
     { id: 1, name: "操作系统核心讲义.pdf", module: "核心理论", time: "2024/3/1" }
   ];
+
+  // 立即执行一次数据同步
   refreshStats();
+  
+  // 每 60 秒自动刷新一次，实现“数据实时同步中”
+  setInterval(refreshStats, 60000);
 });
 </script>
 

@@ -12,10 +12,49 @@ router.get('/getQuestions', async (req, res, next) => {
 });
 
 // 学生提交新提问（实现提交后本地不存，直接入库）
-router.post('/addQuestion', async (req, res, next) => {
-    const questionData = req.body; // 包含 student_id, content
-    const result = await userService.addQuestion(questionData);
-    res.ResultVO(0, '提问已实时同步至教师端', result);
+// A. 定义废词列表，你可以根据实际教学情况随时增加
+const stopWords = ['什么是', '请问', '老师', '想知道', '如何理解', '怎么', '解释下', '的', '了', '呢', '？', '?', '！', '!'];
+
+function getCoreKeywords(text) {
+    let core = text;
+    stopWords.forEach((word) => {
+        // 关键修复：使用 split 和 join 替代 RegExp，这样可以安全处理 ? ! 等特殊符号
+        // 这种方式不需要担心正则表达式的语法冲突
+        core = core.split(word).join('');
+    });
+    // 额外处理：去掉剩余的标点符号
+    core = core.replace(/[?？!！.。，,]/g, '');
+    return core.trim();
+}
+
+router.post('/addQuestion', async (req, res) => {
+    const { content, studentId } = req.body;
+    if (!content) return res.json({ code: -1, msg: '内容不能为空' });
+
+    // 1. 提取核心词（使用修复后的 getCoreKeywords 函数）
+    const core = getCoreKeywords(content);
+
+    try {
+        // --- 核心修复：改为调用 userService 提供的方法 ---
+        // 假设你的 userService 中已经有了 getQuestionsByContent 方法
+        const existing = await userService.getQuestionsByContent(core);
+
+        if (existing && existing.length > 0) {
+            // 2. 匹配成功，调用 userService 增加热度
+            const targetId = existing[0].id;
+            await userService.updateQuestionHot(targetId);
+
+            // 使用你项目规范的 ResultVO 返回
+            res.ResultVO(0, '检测到相似问题，热度已累加', { id: targetId });
+        } else {
+            // 3. 匹配失败，调用 userService 新增记录
+            await userService.addQuestion(studentId, content);
+            res.ResultVO(0, '新问题已入库');
+        }
+    } catch (err) {
+        console.error('【后端报错详情】:', err); // 在控制台打印具体的错误原因
+        res.json({ code: -1, msg: '服务器错误' });
+    }
 });
 
 // 物理删除提问（实现你要求的彻底消失）
