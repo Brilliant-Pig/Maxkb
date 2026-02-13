@@ -33,17 +33,18 @@ router.post('/send-code', async (req, res) => {
  * @body {string} code 验证码
  */
 router.post('/register', async (req, res) => {
-    const { username, email, password, code } = req.body;
+    // 1. 明确解构 role
+    const { username, email, password, code, role } = req.body;
 
-    // 基础校验
-    if (!username || !email || !password || !code) {
-        return res.ResultVO(1, '所有字段均为必填项');
+    // 2. 校验 role 是否存在
+    if (!username || !email || !password || !code || !role) {
+        return res.ResultVO(1, '所有字段均为必填项，包括身份选择');
     }
 
     try {
-        const result = await authService.register({ username, email, password, code });
+        // 3. 将 role 传递给 Service
+        const result = await authService.register({ username, email, password, code, role });
         if (result.success) {
-            // 注册成功直接返回登录凭证（实现注册后自动登录）
             res.ResultVO(0, '注册成功', result.data);
         } else {
             res.ResultVO(1, result.msg || '注册失败');

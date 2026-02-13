@@ -49,9 +49,7 @@ exports.sendEmailCode = async (email) => {
 /**
  * 用户注册逻辑
  */
-exports.register = async (userData) => {
-    const { username, email, password, code } = userData;
-
+exports.register = async ({ username, email, password, code, role }) => {
     // 1. 验证码校验
     const isCodeValid = await authDao.verifyEmailCode(email, code);
     if (!isCodeValid) {
@@ -67,26 +65,24 @@ exports.register = async (userData) => {
     // 3. 密码加盐加密
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // 4. 角色分配逻辑 (如果是特定的邮箱后缀或者是第一个注册者设为老师)
-    // 简单起见：默认 student，你可以手动在数据库改第一个人为 teacher
-    const role = email.includes('teacher') ? 'teacher' : 'student';
+    const userRole = role || 'student';
 
-    // 5. 写入数据库
+    // 5. 写入数据库 (使用 userRole)
     const newUser = await authDao.createUser({
         username,
         email,
         passwordHash,
-        role
+        role: userRole
     });
 
-    // 6. 注册成功直接生成 Token (实现自动登录)
-    const token = await this.generateToken(newUser.id, username, role);
+    // 6. 注册成功直接生成 Token
+    const token = await this.generateToken(newUser.id, username, userRole);
 
     return {
         success: true,
         data: {
             token,
-            user: { username, email, role }
+            user: { username, email, role: userRole }
         }
     };
 };
