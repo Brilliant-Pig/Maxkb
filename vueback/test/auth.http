@@ -25,7 +25,8 @@ Content-Type: application/json
     "username": "TeacherZhang",
     "email": "{{email}}",
     "password": "{{password}}",
-    "code": "241626" 
+    "code": "810407" ,
+    "role": "teacher"
 }
 
 ### 1.3 用户登录

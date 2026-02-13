@@ -1,283 +1,594 @@
-    <template>
-    <div class="auth-container">
-        <div class="auth-card animate__animated animate__fadeIn">
-        <div class="auth-header">
-            <div class="github-logo">
-            <svg height="48" viewBox="0 0 16 16" width="48" fill="white">
-                <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
-            </svg>
-            </div>
-            <h1>{{ isLogin ? '登录到 OS-AI' : '创建您的账号' }}</h1>
+<template>
+    <div class="auth-wrapper">
+        <div class="bg-blobs">
+        <div class="blob"></div>
+        <div class="blob"></div>
+        <div class="blob"></div>
         </div>
 
-        <div class="auth-body">
-            <form @submit.prevent="handleSubmit">
-            
-            <div v-if="!isLogin" class="input-group">
-                <label>用户名</label>
-                <input 
-                v-model="formData.username" 
-                type="text" 
-                placeholder="设置唯一用户名"
-                required
-                />
+        <div class="auth-container">
+        <transition name="scale-fade" mode="out-in">
+            <div class="auth-card" :key="isLogin">
+            <div class="auth-header">
+                <div class="icon-box">
+                <span>{{ isLogin ? '🔐' : '🚀' }}</span>
+                </div>
+                <h2>{{ isLogin ? '登录 OS-AI' : '创建账号，开启AI之旅！' }}</h2>
             </div>
 
-            <div class="input-group">
-                <label>邮箱地址</label>
-                <input 
-                v-model="formData.email" 
-                type="email" 
-                placeholder="name@example.com"
-                required
-                />
-            </div>
+            <div class="auth-body">
+                <form @submit.prevent="isLogin ? handleLogin() : handleRegister()">
+                
+                <div v-if="!isLogin" class="input-field">
+                    <input v-model="registerForm.username" type="text" placeholder=" " required />
+                    <label>用户名</label>
+                    <div class="bar"></div>
+                </div>
 
-            <div v-if="!isLogin" class="input-group">
-                <label>邮箱验证码</label>
-                <div class="verify-wrapper">
-                <input v-model="formData.code" type="text" placeholder="6位数字" maxlength="6" />
-                <button 
-                    type="button" 
-                    :disabled="cooldown > 0" 
-                    @click="sendVerifyCode"
-                    class="btn-verify"
-                >
-                    {{ cooldown > 0 ? `${cooldown}s` : '获取验证码' }}
+                <div class="input-field">
+                    <input v-if="isLogin" v-model="loginForm.email" type="email" placeholder=" " required />
+                    <input v-else v-model="registerForm.email" type="email" placeholder=" " required />
+                    <label>电子邮箱</label>
+                    <div class="bar"></div>
+                </div>
+
+                <div v-if="!isLogin" class="custom-row role-row-box animate-in">
+                <span class="row-title">✨ 你是谁</span>
+                <div class="role-capsule">
+                    <div 
+                    class="role-item" 
+                    :class="{ active: registerForm.role === 'student' }"
+                    @click="registerForm.role = 'student'"
+                    >
+                    <span class="emoji">👨‍🎓</span>
+                    <span class="text">学生</span>
+                    </div>
+                    <div 
+                    class="role-item" 
+                    :class="{ active: registerForm.role === 'teacher' }"
+                    @click="registerForm.role = 'teacher'"
+                    >
+                    <span class="emoji">👩‍🏫</span>
+                    <span class="text">教师</span>
+                    </div>
+                    <div class="role-slider" :class="registerForm.role"></div>
+                </div>
+                </div>
+
+                <div v-if="!isLogin" class="custom-row verify-row-box animate-in">
+                <div class="glass-input-group">
+                    <input v-model="registerForm.code" type="text" placeholder="输入验证码" required />
+                    <button type="button" @click="sendVerifyCode" :disabled="isCounting" class="magic-verify-btn">
+                    {{ isCounting ? `${countdown}s` : '获取验证码' }}
+                    </button>
+                </div>
+                </div>
+
+                <div class="input-field">
+                    <input v-if="isLogin" v-model="loginForm.password" type="password" placeholder=" " required />
+                    <input v-else v-model="registerForm.password" type="password" placeholder=" " required />
+                    <label>密码</label>
+                    <div class="bar"></div>
+                </div>
+
+                <button type="submit" class="submit-btn" :disabled="isSubmitting">
+                    {{ isLogin ? '立即登录' : '完成注册' }}
+                </button>
+                </form>
+
+                <div class="auth-footer">
+                <span>{{ isLogin ? '没有账号?' : '已有账号?' }}</span>
+                <button @click="toggleMode" class="switch-btn">
+                    {{ isLogin ? '去注册' : '去登录' }}
                 </button>
                 </div>
             </div>
-
-            <div class="input-group">
-                <div class="label-row">
-                <label>密码</label>
-                <a v-if="isLogin" href="#" class="forgot-link">忘记密码?</a>
-                </div>
-                <input 
-                v-model="formData.password" 
-                type="password" 
-                required
-                />
             </div>
-
-            <button type="submit" class="btn-primary" :disabled="loading">
-                {{ loading ? '处理中...' : (isLogin ? '立即登录' : '创建账号') }}
-            </button>
-            </form>
-        </div>
-
-        <div class="auth-footer">
-            <p v-if="isLogin">
-            还没有账号? <a @click="toggleMode">创建一个</a>
-            </p>
-            <p v-else>
-            已有账号? <a @click="toggleMode">去登录</a>
-            </p>
-        </div>
+        </transition>
         </div>
     </div>
-    </template>
+</template>
 
-    <script setup>
-    import { ref, reactive } from 'vue';
-    import axios from 'axios';
-    import { useRouter } from 'vue-router';
-    const router = useRouter();
+<script setup>
+import { ref, computed } from 'vue';
+import { useRouter } from 'vue-router';
+import axios from 'axios';
 
-    const isLogin = ref(true);  
-    const loading = ref(false);
-    const cooldown = ref(0);
-    const API_BASE = 'http://127.0.0.1:33001/api/auth';
+const router = useRouter();
+const isLogin = ref(true);
+const isSubmitting = ref(false);
 
-    const formData = reactive({
-    username: '',
-    email: '',
-    password: '',
-    code: ''
-    });
+// 1. 基础配置：后端 API 地址
+const API_BASE = 'http://127.0.0.1:33001/api/auth';
 
-    // 切换登录/注册模式
-    const toggleMode = () => {
-    isLogin.value = !isLogin.value;
-    // 重置表单
-    formData.username = '';
-    formData.email = '';
-    formData.password = '';
-    formData.code = '';
-    };
+// 注册表单数据对象
+const registerForm = ref({ username: '', email: '', password: '', code: '', role: 'student' });
 
-    // 发送验证码逻辑
-    const sendVerifyCode = async () => {
-    if (!formData.email) return alert('请先输入邮箱');
+// 登录表单数据对象 (如果你登录部分也报同样的错，也得加上这个)
+const loginForm = ref({ email: '', password: '' });
+// 验证码倒计时逻辑
+const verifyCodeBtnText = ref('获取验证码');
+const isCounting = ref(false);
+const countdown = ref(60);
+
+// --- 逻辑函数 ---
+
+// 1. 发送验证码
+const sendVerifyCode = async () => {
+    if (!registerForm.value.email) {
+        alert('请先输入邮箱');
+        return;
+    }
     
+    isCounting.value = true;
     try {
-        // 模拟后端调用
-        console.log('正在向邮箱发送验证码:', formData.email);
-        // const res = await axios.post(`${API_BASE}/send-code`, { email: formData.email });
+        const res = await axios.post(`${API_BASE}/send-code`, {
+            email: registerForm.value.email
+        });
         
-        alert('验证码已发送至您的邮箱');
-        
-        // 启动倒计时
-        cooldown.value = 60;
-        const timer = setInterval(() => {
-        cooldown.value--;
-        if (cooldown.value <= 0) clearInterval(timer);
-        }, 1000);
+        if (res.data.code === 0) {
+            alert('验证码已发送，请查收邮箱');
+            // 开始倒计时
+            const timer = setInterval(() => {
+                countdown.value--;
+                verifyCodeBtnText.value = `${countdown.value}s 后重发`;
+                if (countdown.value <= 0) {
+                    clearInterval(timer);
+                    isCounting.value = false;
+                    countdown.value = 60;
+                    verifyCodeBtnText.value = '获取验证码';
+                }
+            }, 1000);
+        } else {
+            alert(res.data.message);
+            isCounting.value = false;
+        }
     } catch (err) {
-        alert('发送失败，请稍后再试');
+        alert('发送失败，请检查后端网络');
+        isCounting.value = false;
     }
-    };
+};
 
-    const handleSubmit = async () => {
-    loading.value = true;
+// 2. 处理登录
+const handleLogin = async () => {
+    isSubmitting.value = true;
     try {
-        // 这里是你之后的 axios 请求逻辑，现在先写模拟数据
-        // 假设后端返回了用户信息：{ email, username, role, token }
-        const mockRole = formData.email.includes('teacher') ? 'teacher' : 'student'; // 演示用逻辑
-        
-        const userData = {
-        username: formData.username || '新用户',
-        email: formData.email,
-        role: mockRole, 
-        token: 'temp_token_' + Date.now()
-        };
+        const res = await axios.post(`${API_BASE}/login`, {
+            email: loginForm.value.email,
+            password: loginForm.value.password
+        });
 
-        // 1. 存储到本地，供路由守卫检查
-        localStorage.setItem('user', JSON.stringify(userData));
-
-        // 2. 注册/登录成功后，统一跳转到作业助手
-        alert(isLogin.value ? '登录成功' : '注册成功并已自动登录');
-        router.push('/HomeworkAssistant');
-
+        if (res.data.code === 0) {
+            // 存储 Token 和用户信息
+            localStorage.setItem('token', res.data.data.token);
+            localStorage.setItem('user', JSON.stringify(res.data.data.user));
+            
+            // 根据角色跳转（逻辑与 router.js 匹配）
+            if (res.data.data.user.role === 'teacher') {
+                router.push('/TeacherConsole');
+            } else {
+                router.push('/HomeworkAssistant');
+            }
+        } else {
+            alert(res.data.message);
+        }
     } catch (err) {
-        alert('操作失败，请检查网络');
+        alert('登录异常，请稍后再试');
     } finally {
-        loading.value = false;
+        isSubmitting.value = false;
     }
-    };
-    </script>
+};
+
+// 3. 处理注册
+const handleRegister = async () => {
+    isSubmitting.value = true;
+    try {
+        // 1. 打印提交的数据，检查 role 是否正确（'student' 或 'teacher'）
+        console.log("提交注册数据:", registerForm.value);
+
+        const res = await axios.post('http://localhost:33001/api/auth/register', registerForm.value);
+
+        if (res.data.code === 0) {
+            // 2. 这里的解构赋值要和后端返回的 data 字段匹配
+            // 假设后端返回 { code: 0, data: { token: '...', user: { role: 'teacher', ... } } }
+            const { token, user } = res.data.data;
+
+            // 3. 存储用户信息到本地
+            localStorage.setItem('token', token);
+            localStorage.setItem('user', JSON.stringify(user));
+
+            alert('注册成功！');
+
+            // 4. 根据角色跳转（注意路由名称要和 router.js 一致）
+            if (user.role === 'teacher') {
+                router.push('/TeacherConsole'); // 这里的路径一定要在 router.js 中定义过
+            } else {
+                router.push('/ImmersiveLab');
+            }
+        } else {
+            alert(res.data.message || '注册失败');
+        }
+    } catch (error) {
+        console.error("注册错误详情:", error);
+        alert(error.response?.data?.message || '服务器连接失败，请检查网络');
+    } finally {
+        isSubmitting.value = false;
+    }
+};
+
+const toggleMode = () => {
+    isLogin.value = !isLogin.value;
+};
+</script>
 
     <style scoped>
-    .auth-container {
+    .auth-wrapper {
     min-height: 100vh;
     display: flex;
-    justify-content: center;
     align-items: center;
-    background-color: #0d1117; /* GitHub 背景色 */
-    color: #c9d1d9;
+    justify-content: center;
+    background: #0f172a;
+    padding: 20px;
     }
 
+    .bg-blobs {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    }
+
+    .blob {
+    position: absolute;
+    width: 400px;
+    height: 400px;
+    background: linear-gradient(180deg, rgba(56, 189, 248, 0.2) 0%, rgba(59, 130, 246, 0.2) 100%);
+    filter: blur(80px);
+    border-radius: 50%;
+    animation: move 20s infinite alternate;
+    }
+
+    .blob:nth-child(2) { background: rgba(139, 92, 246, 0.15); left: 50%; animation-delay: -5s; }
+    .blob:nth-child(3) { background: rgba(236, 72, 153, 0.15); right: 0; bottom: 0; animation-delay: -10s; }
+
+    /* 缩放淡入动画 */
+    .scale-fade-enter-active, .scale-fade-leave-active { transition: all 0.3s ease; }
+    .scale-fade-enter-from { opacity: 0; transform: scale(0.95); }
+    .scale-fade-leave-to { opacity: 0; transform: scale(1.05); }
+
+    @keyframes move {
+    from { transform: translate(-10%, -10%) scale(1); }
+    to { transform: translate(20%, 20%) scale(1.2); }
+    }
+
+    /* --- 毛玻璃卡片 --- */
     .auth-card {
-    width: 340px;
-    padding: 20px;
-    }
-
-    .auth-header {
-    text-align: center;
-    margin-bottom: 20px;
-    }
-
-    .auth-header h1 {
-    font-size: 24px;
-    font-weight: 300;
-    margin-top: 15px;
-    letter-spacing: -0.5px;
-    }
-
-    .auth-body {
-    background-color: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 6px;
-    padding: 20px;
-    margin-bottom: 15px;
-    }
-
-    .input-group {
-    margin-bottom: 15px;
-    }
-
-    .input-group label {
-    display: block;
-    font-size: 14px;
-    margin-bottom: 7px;
-    text-align: left;
-    }
-
-    .input-group input {
     width: 100%;
-    padding: 5px 12px;
-    font-size: 14px;
-    background-color: #0d1117;
-    border: 1px solid #30363d;
-    border-radius: 6px;
-    color: white;
-    box-sizing: border-box;
+    max-width: 380px; /* 缩小宽度 */
+    max-height: 90vh; /* 防止超出屏幕 */
+    overflow-y: auto; /* 必要时滚动 */
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 30px; /* 缩小内边距 */
+    box-shadow: 0 20px 40px rgba(0,0,0,0.4);
     }
+    /* 隐藏滚动条但保留功能 */
+    .auth-card::-webkit-scrollbar { width: 0px; }
 
-    .input-group input:focus {
-    border-color: #58a6ff;
+    .auth-header { text-align: center; margin-bottom: 25px; }
+    .auth-header h2 { color: white; margin-top: 10px; font-size: 1.5rem; }
+
+    /* 输入框紧凑样式 */
+    .input-field { position: relative; margin-bottom: 25px; }
+    .input-field input {
+    width: 100%;
+    padding: 8px 0;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid rgba(255,255,255,0.2);
+    color: white;
     outline: none;
-    box-shadow: 0 0 0 3px rgba(56, 139, 253, 0.3);
+    }
+    .input-field label {
+    position: absolute;
+    left: 0; top: 8px;
+    color: rgba(255,255,255,0.4);
+    transition: 0.3s;
+    pointer-events: none;
+    }
+    .input-field input:focus ~ label,
+    .input-field input:not(:placeholder-shown) ~ label {
+    top: -15px; font-size: 12px; color: #3b82f6;
     }
 
-    .verify-wrapper {
-    display: flex;
-    gap: 8px;
+    .bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background: #3b82f6;
+    transition: 0.4s;
     }
 
-    .btn-verify {
-    white-space: nowrap;
-    background-color: #21262d;
-    border: 1px solid #30363d;
-    color: #58a6ff;
-    border-radius: 6px;
-    padding: 0 10px;
-    cursor: pointer;
-    font-size: 12px;
-    }
-
-    .btn-verify:disabled {
-    color: #8b949e;
-    cursor: not-allowed;
-    }
-
-    .btn-primary {
+    .input-field input:focus ~ .bar {
     width: 100%;
-    background-color: #238636;
-    color: white;
-    border: 1px solid rgba(240, 246, 252, 0.1);
-    border-radius: 6px;
-    padding: 7px 16px;
-    font-weight: 500;
-    cursor: pointer;
+    }
+
+    /* --- 身份选择器 --- */
+    .role-options {
+    display: flex;
+    gap: 12px;
     margin-top: 10px;
     }
 
-    .btn-primary:hover {
-    background-color: #2ea043;
-    }
-
-    .auth-footer {
-    border: 1px solid #30363d;
-    border-radius: 6px;
-    padding: 15px;
+    .role-options label {
+    flex: 1;
+    padding: 10px;
     text-align: center;
-    font-size: 14px;
-    }
-
-    .auth-footer a, .forgot-link {
-    color: #58a6ff;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    color: #94a3b8;
     cursor: pointer;
-    text-decoration: none;
+    transition: 0.3s;
     }
 
-    .label-row {
+    .role-options label.active {
+    background: rgba(59, 130, 246, 0.2);
+    border-color: #3b82f6;
+    color: #fff;
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
+    }
+
+    .role-options input { display: none; }
+
+    /* --- 按钮系列 --- */
+    .submit-btn {
+    width: 100%; padding: 12px; border-radius: 10px; border: none;
+    background: linear-gradient(90deg, #3b82f6, #2563eb);
+    color: white; font-weight: bold; cursor: pointer; transition: 0.3s;
+    }
+    .submit-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+
+    .ghost-btn {
+    background: transparent;
+    border: none;
+    color: #3b82f6;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 5px 10px;
+    transition: 0.3s;
+    }
+
+    .ghost-btn:hover {
+    background: rgba(59, 130, 246, 0.1);
+    border-radius: 8px;
+    }
+
+    .auth-footer { text-align: center; margin-top: 20px; font-size: 13px; color: #94a3b8; }
+
+    /* --- 切换动画 --- */
+    .fade-slide-enter-active, .fade-slide-leave-active {
+    transition: all 0.4s ease;
+    }
+    .fade-slide-enter-from { opacity: 0; transform: translateY(-20px); }
+    .fade-slide-leave-to { opacity: 0; transform: translateY(20px); }
+
+    .animate-in {
+    animation: fadeInUp 0.5s ease backwards;
+    }
+    .role-group {
+    margin-bottom: 25px; /* 增加间距，防止文字重叠 */
+    }
+
+    .section-label {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 13px;
+    margin-bottom: 10px;
+    }
+    /* 验证码专用布局 */
+    .input-row {
+    display: flex;
+    align-items: center;
+    position: relative;
+    }
+
+    .input-field.verify-field input {
+    padding-right: 80px; /* 为右侧按钮留出空间 */
+    }
+
+    .inner-verify-btn {
+    position: absolute;
+    right: 0;
+    bottom: 8px;
+    background: rgba(59, 130, 246, 0.15);
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    color: #60a5fa;
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: 0.3s;
+    z-index: 5; /* 确保在输入框上层 */
+    }
+
+    .inner-verify-btn:hover:not(:disabled) {
+    background: rgba(59, 130, 246, 0.3);
+    color: white;
+    }
+
+    .inner-verify-btn:disabled {
+    color: #64748b;
+    border-color: rgba(255,255,255,0.1);
+    cursor: not-allowed;
+    }
+
+    /* 紧凑布局：身份和验证码放一行 */
+    .compact-row {
     display: flex;
     justify-content: space-between;
+    align-items: flex-end;
+    gap: 15px;
+    margin-bottom: 25px;
+    }
+    .role-mini-group { flex: 1; }
+    .mini-label { display: block; color: rgba(255,255,255,0.4); font-size: 12px; margin-bottom: 5px; }
+    .mini-options {
+    display: flex;
+    background: rgba(255,255,255,0.05);
+    border-radius: 8px;
+    padding: 2px;
+    }
+    .mini-options button {
+    flex: 1; padding: 4px; border: none; background: transparent; 
+    color: #94a3b8; font-size: 12px; cursor: pointer; border-radius: 6px;
+    }
+    .mini-options button.active { background: #3b82f6; color: white; }
+
+    .verify-mini-field {
+    flex: 1;
+    border-bottom: 1px solid rgba(255,255,255,0.2);
+    display: flex;
     align-items: center;
     }
+    .verify-mini-field input {
+    width: 60%; padding: 8px 0; background: transparent; border: none; color: white; font-size: 14px; outline: none;
+    }
+    .text-link-btn {
+    background: transparent; border: none; color: #3b82f6; font-size: 12px; cursor: pointer;
+    }
+    .switch-btn { background: transparent; border: none; color: #3b82f6; cursor: pointer; margin-left: 5px; font-weight: bold; }
+    /* 身份选择行样式 */
+    .role-field {
+    margin-bottom: 20px;
+    }
 
-    .forgot-link {
+    .static-label {
+    display: block;
     font-size: 12px;
+    color: rgba(255, 255, 255, 0.5);
+    margin-bottom: 8px;
+    text-align: left;
+    }
+
+    /* 自定义行容器，彻底解决重叠 */
+    .custom-row {
+    margin-bottom: 22px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    }
+
+    .row-title {
+    font-size: 15px;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 10px;
+    font-weight: 500;
+    }
+
+    /* --- 灵动胶囊身份选择器 --- */
+    .role-capsule {
+    position: relative;
+    display: flex;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .role-item {
+    flex: 1;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 0;
+    cursor: pointer;
+    color: #94a3b8;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .role-item.active {
+    color: #fff;
+    }
+
+    .role-item .emoji { font-size: 18px; }
+    .role-item .text { font-weight: 600; font-size: 14px; }
+
+    /* 胶囊滑块 */
+    .role-slider {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: calc(50% - 4px);
+    height: calc(100% - 8px);
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    border-radius: 11px;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    z-index: 1;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    }
+
+    .role-slider.teacher {
+    transform: translateX(100%);
+    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+    }
+
+    /* --- 玻璃感验证码输入 --- */
+    .glass-input-group {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 2px 12px;
+    transition: 0.3s;
+    }
+
+    .glass-input-group:focus-within {
+    border-color: #3b82f6;
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
+    }
+
+    .glass-input-group input {
+    flex: 1;
+    background: transparent !important;
+    border: none !important;
+    color: white !important;
+    padding: 12px 0 !important;
+    font-size: 14px;
+    outline: none;
+    }
+
+    .magic-verify-btn {
+    background: transparent;
+    border: none;
+    color: #60a5fa;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    padding-left: 15px;
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+    transition: 0.3s;
+    }
+
+    .magic-verify-btn:hover:not(:disabled) {
+    color: #93c5fd;
+    transform: scale(1.05);
+    }
+
+    .magic-verify-btn:disabled {
+    color: #64748b;
+    }
+    @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
     }
     </style>

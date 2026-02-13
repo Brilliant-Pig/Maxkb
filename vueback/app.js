@@ -24,6 +24,7 @@ const server_conf = require('config').get('serverConfig');
 
 // 路由规则
 const baseUrl = server_conf.baseUrl || '/api';
+app.use(`${baseUrl}/auth`, require('./src/controller/authController'));
 app.use(`${baseUrl}/user`, require('./src/controller/userController'));
 
 // 启动服务器
