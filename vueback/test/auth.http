@@ -42,6 +42,26 @@ Content-Type: application/json
 ### 获取登录后的 Token (用于后续请求)
 @authToken = {{login.response.body.data.token}}
 
+### 1.4 退出登录 (测试黑名单功能)
+# 调用此接口后，authToken 应该会被加入数据库黑名单
+POST {{baseUrl}}/logout
+Authorization: Bearer {{authToken}}
+
+
+# ==========================================
+# 第二阶段：权限与失效性测试 (Authorization)
+# ==========================================
+
+### 2.1 校验凭证有效性 (在退出登录后执行此项)
+# 预期结果：即使 Token 没过期，后端也应返回 401 "凭证已失效"
+POST {{baseUrl}}/tokenVerify
+Authorization: Bearer {{authToken}}
+
+
+### 2.2 测试受保护的数据接口 (权限拦截测试)
+# 预期结果：401 Unauthorized
+GET http://127.0.0.1:33001/api/teacher/dashboard
+Authorization: Bearer {{authToken}}
 
 # ==========================================
 # 第二阶段：权限与角色测试 (Authorization)

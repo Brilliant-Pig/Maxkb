@@ -12,9 +12,9 @@
         <router-link to="/HomeworkAssistant" class="nav-link">作业助手</router-link>
         <router-link to="/LearningDashboard" class="nav-link">学业评价</router-link>
         <router-link to="/TeacherConsole" class="nav-link">教师后台</router-link>
+        <UserAvatar />
       </div>
     </nav>
-    
     <div class="view-container">
       <router-view v-slot="{ Component }">
         <transition name="fade-transform" mode="out-in">
@@ -39,7 +39,7 @@
 import { computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import 'animate.css'
-
+import UserAvatar from './components/UserDropdown.vue'; // ✨ 引入组件 ✨
 const route = useRoute()
 const showNav = computed(() => route.name !== 'login')
 const user = JSON.parse(localStorage.getItem('user'));
@@ -139,6 +139,7 @@ body, html {
 .nav-links {
   display: flex;
   gap: 30px;
+  align-items: center;
 }
 
 .nav-link {

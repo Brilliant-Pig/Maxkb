@@ -5,6 +5,8 @@ const baseUrl = require('config').get('serverConfig').baseUrl;
 
 const authService = require('../service/authService');
 
+const authDao = require('../dao/authDao'); // ✨ 1. 引入 Dao 层
+
 // 接口前缀白名单
 const apiPrefixWhiteList = [
     '/auth', // 认证相关接口
@@ -13,34 +15,49 @@ const apiPrefixWhiteList = [
 
 // 鉴权函数
 const apiProtected = async (req, res, next) => {
-    // 先过滤掉请求路径中的 baseUrl 部分
     const pathWithoutBaseUrl = req.path.startsWith(baseUrl) ? req.path.slice(baseUrl.length) : req.path;
-    // 检测请求路径前缀是否在白名单中
     const isWhitelisted = apiPrefixWhiteList.some((prefix) => pathWithoutBaseUrl.startsWith(prefix));
+
     if (isWhitelisted) {
         next();
     } else {
-        // 如果请求路径不在白名单中，则检测请求头中是否包含 Authorization
         const authorization = req.headers['authorization'] || req.headers['Authorization'];
         if (!authorization) {
             res.ResultVO(401, '未提供 Authorization');
             return;
         }
-        // 从 Authorization 中提取 token
+
         const token = authorization.split(' ')[1];
         if (!token) {
-            res.ResultVO(401, 'Authorization 格式不满足 OAuth2 标准');
+            res.ResultVO(401, 'Authorization 格式错误');
             return;
         }
-        // 验证 token
+
+        // --- 开始校验逻辑 ---
+
+        // ✨ 2. 检查黑名单：如果 Token 在黑名单里，直接拦截
+        try {
+            const isBlacklisted = await authDao.isTokenBlacklisted(token);
+            if (isBlacklisted) {
+                res.ResultVO(401, '凭证已失效，请重新登录');
+                return;
+            }
+        } catch (err) {
+            console.error('黑名单查询失败:', err);
+            // 数据库出错时建议保守处理，或者 next()，这里我们选择拦截
+            res.ResultVO(500, '认证系统异常');
+            return;
+        }
+
+        // 3. 验证 token 签名和有效期
         const payload = await authService.tokenVerify(token);
         if (!payload) {
-            res.ResultVO(401, 'token 无效');
+            res.ResultVO(401, 'token 无效或已过期');
             return;
         }
-        // 将 token 解析后的 payload 挂载到 req 上
-        req.payload = payload;
-        // 验证通过，继续执行后续操作
+
+        // 验证通过，挂载用户信息
+        req.user = payload;
         next();
     }
 };
