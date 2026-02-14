@@ -62,6 +62,11 @@ router.beforeEach((to, from, next) => {
     const token = localStorage.getItem('token');
     const user = JSON.parse(localStorage.getItem('user'));
 
+    // 1. 首页重定向处理
+    if (to.path === '/') {
+        return next({ path: '/login' });
+    }
+
     // 2. 免登录页面直接放行
     if (to.meta.freeAuth) {
         return next();

@@ -90,138 +90,81 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 
 const router = useRouter();
 const isLogin = ref(true);
-const isSubmitting = ref(false);
+const isLoading = ref(false);
+const countdown = ref(0);
 
-// 1. 基础配置：后端 API 地址
-const API_BASE = 'http://127.0.0.1:33001/api/auth';
-
-// 注册表单数据对象
+const loginForm = ref({ email: '', password: '' });
 const registerForm = ref({ username: '', email: '', password: '', code: '', role: 'student' });
 
-// 登录表单数据对象 (如果你登录部分也报同样的错，也得加上这个)
-const loginForm = ref({ email: '', password: '' });
-// 验证码倒计时逻辑
-const verifyCodeBtnText = ref('获取验证码');
-const isCounting = ref(false);
-const countdown = ref(60);
+const toggleMode = () => { isLogin.value = !isLogin.value; };
 
-// --- 逻辑函数 ---
-
-// 1. 发送验证码
-const sendVerifyCode = async () => {
-    if (!registerForm.value.email) {
-        alert('请先输入邮箱');
-        return;
-    }
-    
-    isCounting.value = true;
+// 发送验证码
+const sendEmailCode = async () => {
+    if (!registerForm.value.email) return alert('请先填写邮箱');
     try {
-        const res = await axios.post(`${API_BASE}/send-code`, {
-            email: registerForm.value.email
-        });
-        
+        const res = await axios.post('http://127.0.0.1:33001/api/auth/send-code', { email: registerForm.value.email });
         if (res.data.code === 0) {
-            alert('验证码已发送，请查收邮箱');
-            // 开始倒计时
+            alert('验证码已发送');
+            countdown.value = 60;
             const timer = setInterval(() => {
                 countdown.value--;
-                verifyCodeBtnText.value = `${countdown.value}s 后重发`;
-                if (countdown.value <= 0) {
-                    clearInterval(timer);
-                    isCounting.value = false;
-                    countdown.value = 60;
-                    verifyCodeBtnText.value = '获取验证码';
-                }
+                if (countdown.value <= 0) clearInterval(timer);
             }, 1000);
-        } else {
-            alert(res.data.message);
-            isCounting.value = false;
-        }
-    } catch (err) {
-        alert('发送失败，请检查后端网络');
-        isCounting.value = false;
-    }
+        } else { alert(res.data.msg); }
+    } catch (e) { alert('发送失败'); }
 };
 
-// 2. 处理登录
+// 登录逻辑
 const handleLogin = async () => {
-    isSubmitting.value = true;
+    isLoading.value = true;
     try {
-        const res = await axios.post(`${API_BASE}/login`, {
-            email: loginForm.value.email,
-            password: loginForm.value.password
-        });
-
+        const res = await axios.post('http://127.0.0.1:33001/api/auth/login', loginForm.value);
         if (res.data.code === 0) {
-            // 存储 Token 和用户信息
+            // ✨ 关键存储
             localStorage.setItem('token', res.data.data.token);
-            localStorage.setItem('user', JSON.stringify(res.data.data.user));
+            localStorage.setItem('user', JSON.stringify(res.data.data.user)); 
             
-            // 根据角色跳转（逻辑与 router.js 匹配）
+            alert('欢迎回来！');
             if (res.data.data.user.role === 'teacher') {
                 router.push('/TeacherConsole');
             } else {
                 router.push('/HomeworkAssistant');
             }
-        } else {
-            alert(res.data.message);
-        }
-    } catch (err) {
-        alert('登录异常，请稍后再试');
-    } finally {
-        isSubmitting.value = false;
-    }
+        } else { alert(res.data.msg); }
+    } catch (e) { alert('登录异常'); }
+    finally { isLoading.value = false; }
 };
 
-// 3. 处理注册
+// 注册逻辑
 const handleRegister = async () => {
-    isSubmitting.value = true;
+    isLoading.value = true;
     try {
-        // 1. 打印提交的数据，检查 role 是否正确（'student' 或 'teacher'）
-        console.log("提交注册数据:", registerForm.value);
-
-        const res = await axios.post('http://localhost:33001/api/auth/register', registerForm.value);
-
+        const res = await axios.post('http://127.0.0.1:33001/api/auth/register', registerForm.value);
         if (res.data.code === 0) {
-            // 2. 这里的解构赋值要和后端返回的 data 字段匹配
-            // 假设后端返回 { code: 0, data: { token: '...', user: { role: 'teacher', ... } } }
-            const { token, user } = res.data.data;
-
-            // 3. 存储用户信息到本地
-            localStorage.setItem('token', token);
-            localStorage.setItem('user', JSON.stringify(user));
-
-            alert('注册成功！');
-
-            // 4. 根据角色跳转（注意路由名称要和 router.js 一致）
+            // ✨ 注册成功通常也会返回 token 和用户信息
+            localStorage.setItem('token', res.data.data.token);
+            localStorage.setItem('user', JSON.stringify(res.data.data.user));
+            
+            alert('注册成功并已登录！');
+            const user = res.data.data.user;
             if (user.role === 'teacher') {
                 router.push('/TeacherConsole'); // 这里的路径一定要在 router.js 中定义过
             } else {
                 router.push('/ImmersiveLab');
             }
-        } else {
-            alert(res.data.message || '注册失败');
-        }
-    } catch (error) {
-        console.error("注册错误详情:", error);
-        alert(error.response?.data?.message || '服务器连接失败，请检查网络');
-    } finally {
-        isSubmitting.value = false;
-    }
-};
-
-const toggleMode = () => {
-    isLogin.value = !isLogin.value;
+        } else { alert(res.data.msg); }
+    } catch (e) { alert('注册失败'); }
+    finally { isLoading.value = false; }
 };
 </script>
 
-    <style scoped>
+<style scoped>
     .auth-wrapper {
     min-height: 100vh;
     display: flex;
@@ -591,4 +534,4 @@ const toggleMode = () => {
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
     }
-    </style>
+</style>

@@ -4,14 +4,15 @@
       <div class="avatar-circle">
         {{ username.charAt(0).toUpperCase() }}
       </div>
-      <span class="material-icons">arrow_drop_down</span>
+      <span class="user-name-display">{{ username }}</span>
+      <span class="material-icons"></span>
     </div>
 
     <transition name="github-fade">
       <div v-if="isOpen" class="profile-dropdown">
         <div class="user-header">
-          <p class="signed-in-as">当前登录身份</p>
-          <p class="user-name">{{ username }}</p>
+          <p class="signed-in-as">当前登录邮箱</p>
+          <p class="user-email">{{ email }}</p>
         </div>
         
         <div class="dropdown-divider"></div>
@@ -35,7 +36,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 
@@ -43,56 +44,91 @@ const router = useRouter();
 const isOpen = ref(false);
 const dropdownRef = ref(null);
 
-// 从本地存储获取用户信息
-const user = JSON.parse(localStorage.getItem('user') || '{}');
-const username = user.username || 'User';
-const role = user.role || 'student';
+// ✨ 核心逻辑：从 localStorage 获取完整的用户信息
+const userData = ref(JSON.parse(localStorage.getItem('user') || '{}'));
 
-const toggleDropdown = () => { isOpen.value = !isOpen.value; };
+// 使用 computed 保证响应式
+const username = computed(() => userData.value.username || '未登录');
+// ✨ 新增：获取邮箱
+const email = computed(() => userData.value.email || '未知邮箱');
+const role = computed(() => userData.value.role || 'user');
 
-// UserDropdown.vue 中的 script 部分
+const toggleDropdown = () => {
+  isOpen.value = !isOpen.value;
+};
 
+// 处理退出登录
 const handleLogout = async () => {
   try {
     const token = localStorage.getItem('token');
-    
     if (token) {
-      // ⚠️ 注意：这里的 URL 路径要根据你后端的实际配置修改
-      // 如果你配置了 axios 拦截器，可以直接写 '/auth/logout'
+      // 1. 通知后端作废 Token
       await axios.post('http://127.0.0.1:33001/api/auth/logout', {}, {
-        headers: { 
-          'Authorization': `Bearer ${token}` 
-        }
+        headers: { Authorization: `Bearer ${token}` }
       });
     }
   } catch (error) {
-    // 即使后端接口报错（比如网络问题），前端通常也要清理本地缓存并跳转
-    console.error('后端退出接口调用失败:', error);
+    console.error('登出接口调用失败:', error);
   } finally {
-    // 无论成功还是失败，都执行下面的清理工作
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    
+    // 2. 无论后端是否成功，前端必须清空
+    localStorage.clear();
     isOpen.value = false;
-    router.push('/login'); // 跳转回登录页
+    // 3. 强制跳转到登录页
+    window.location.href = '/login'; 
   }
 };
 
-const handleProfile = () => { alert('个人中心开发中...'); isOpen.value = false; };
-const handleHelp = () => { window.open('https://github.com/', '_blank'); isOpen.value = false; };
-
-// 点击外部自动关闭
+// 点击外部关闭下拉框
 const handleClickOutside = (event) => {
   if (dropdownRef.value && !dropdownRef.value.contains(event.target)) {
     isOpen.value = false;
   }
 };
 
-onMounted(() => document.addEventListener('click', handleClickOutside));
-onUnmounted(() => document.removeEventListener('click', handleClickOutside));
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside);
+});
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside);
+});
+
+// 模拟跳转
+const handleProfile = () => { alert('个人设置开发中...'); isOpen.value = false; };
+const handleHelp = () => { alert('请联系系统管理员'); isOpen.value = false; };
 </script>
 
 <style scoped>
+.avatar-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.avatar-trigger:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.user-name-display {
+  color: #c9d1d9;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.user-email {
+  font-size: 14px;
+  color: #c9d1d9;
+  font-weight: 600;
+  margin: 4px 0 0 0;
+  /* 防止邮箱过长撑破布局 */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .user-profile-container { position: relative; display: inline-block; }
 
 .avatar-trigger {
@@ -164,4 +200,7 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside));
 /* 动画 */
 .github-fade-enter-active, .github-fade-leave-active { transition: opacity 0.2s, transform 0.2s; }
 .github-fade-enter-from, .github-fade-leave-to { opacity: 0; transform: translateY(-10px); }
+
+.status-dot.teacher { background: #8b5cf6; } /* 老师用紫色点 */
+.status-dot.student { background: #2ea44f; } /* 学生用绿色点 */
 </style>

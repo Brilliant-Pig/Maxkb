@@ -1,20 +1,25 @@
 <template>
-  <button v-if="userRole === 'teacher'" @click="goToAdmin">
-  进入教师管理后台
-  </button>
   <div id="app">
     <div class="particles-bg"></div>
 
     <nav v-if="showNav" class="main-nav animate__animated animate__fadeInDown">
       <div class="nav-logo">OS-AI 智学系统</div>
+      
       <div class="nav-links">
         <router-link to="/ImmersiveLab" class="nav-link">AI实验室</router-link>
         <router-link to="/HomeworkAssistant" class="nav-link">作业助手</router-link>
         <router-link to="/LearningDashboard" class="nav-link">学业评价</router-link>
-        <router-link to="/TeacherConsole" class="nav-link">教师后台</router-link>
-        <UserAvatar />
+        
+        <router-link 
+          v-if="isLoggedIn && userRole === 'teacher'" 
+          to="/TeacherConsole" 
+          class="nav-link"
+        >教师后台</router-link>
+
+        <UserAvatar v-if="isLoggedIn" />
       </div>
     </nav>
+    
     <div class="view-container">
       <router-view v-slot="{ Component }">
         <transition name="fade-transform" mode="out-in">
@@ -36,36 +41,57 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
-import 'animate.css'
-import UserAvatar from './components/UserDropdown.vue'; // ✨ 引入组件 ✨
-const route = useRoute()
-const showNav = computed(() => route.name !== 'login')
-const user = JSON.parse(localStorage.getItem('user'));
-const userRole = user ? user.role : '';
+// ✨ 1. 补全所有缺失的 Vue API 引入
+import { ref, onMounted, watch } from 'vue'; 
+import { useRoute } from 'vue-router';
+// ✨ 2. 引入头像组件
+import UserAvatar from './components/UserDropdown.vue';
 
+const route = useRoute();
+const showNav = ref(true);
+const isLoggedIn = ref(false); // 是否已登录
+const userRole = ref('');      // 用户角色
+
+/**
+ * ✨ 核心逻辑：从本地存储更新权限状态
+ */
+const updateAuthState = () => {
+  try {
+    const token = localStorage.getItem('token');
+    const userStr = localStorage.getItem('user');
+    
+    // 确保 token 和 user 字符串都存在，且不是错误的 "undefined" 字符串
+    if (token && userStr && userStr !== 'undefined') {
+      const user = JSON.parse(userStr);
+      isLoggedIn.value = true;
+      userRole.value = user.role || '';
+    } else {
+      isLoggedIn.value = false;
+      userRole.value = '';
+    }
+  } catch (e) {
+    console.error("解析用户信息失败", e);
+    isLoggedIn.value = false;
+  }
+};
+
+// 页面加载时初始化一次
 onMounted(() => {
-  // --- 关键修改：建立页面间的联系逻辑 ---
+  updateAuthState();
+});
+
+/**
+ * ✨ 监听路由变化
+ * 1. 控制导航栏在登录页隐藏
+ * 2. 每次切换页面时重新校验登录状态，确保右上角实时同步
+ */
+watch(() => route.path, (newPath) => {
+  // 判断是否处于登录/注册页面
+  showNav.value = !['/login', '/Auth'].includes(newPath);
   
-  // 1. 初始化分组信息 (模拟准实验研究的分组)
-  if (!localStorage.getItem('os_user_group')) {
-    // 默认设为实验组，后续可在教师后台切换
-    localStorage.setItem('os_user_group', 'experiment_group'); 
-  }
-
-  // 2. 初始化行为日志库 (用于 Page 1/2 产生数据，Page 4 展示数据)
-  if (!localStorage.getItem('os_chat_logs')) {
-    localStorage.setItem('os_chat_logs', JSON.stringify([]));
-  }
-
-  // 3. 初始化量表状态
-  if (!localStorage.getItem('os_survey_done')) {
-    localStorage.setItem('os_survey_done', 'false');
-  }
-
-  console.log("OS-AI 系统初始化完成，分组：", localStorage.getItem('os_user_group'));
-})
+  // 刷新登录状态
+  updateAuthState();
+});
 </script>
 
 <style>
