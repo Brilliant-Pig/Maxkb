@@ -138,3 +138,25 @@ exports.tokenVerify = async (token) => {
         return null;
     }
 };
+// src/service/authService.js
+
+exports.logout = async (token) => {
+    try {
+        // 1. 解析 token 拿到过期时间 (exp)
+        const decoded = jwt.decode(token);
+        if (!decoded || !decoded.exp) {
+            return { success: false, msg: '无效的凭证' };
+        }
+
+        // 2. 将秒级时间戳转为数据库日期格式
+        const expiresAt = new Date(decoded.exp * 1000).toISOString();
+
+        // 3. 存入黑名单
+        await authDao.addTokenToBlacklist(token, expiresAt);
+
+        return { success: true, msg: '已安全退出' };
+    } catch (err) {
+        console.error('退出逻辑异常:', err);
+        return { success: false, msg: '退出失败' };
+    }
+};

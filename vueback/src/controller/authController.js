@@ -91,3 +91,21 @@ router.post('/tokenVerify', async (req, res, next) => {
         res.ResultVO(1, '凭证无效');
     }
 });
+// src/controller/authController.js
+
+router.post('/logout', async (req, res) => {
+    // 1. 从请求头获取 token (Bearer <token>)
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+        return res.ResultVO(1, '未提供凭证');
+    }
+
+    const result = await authService.logout(token);
+    if (result.success) {
+        res.ResultVO(0, '退出登录成功');
+    } else {
+        res.ResultVO(1, result.msg);
+    }
+});

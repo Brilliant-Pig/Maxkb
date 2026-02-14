@@ -93,3 +93,22 @@ exports.login = async (userId) => {
     `;
     return await db.query(sql, [userId, userId]);
 };
+// src/dao/authDao.js
+
+/**
+ * 将 Token 加入黑名单
+ */
+exports.addTokenToBlacklist = async (token, expiresAt) => {
+    const sql = `INSERT INTO token_blacklist (token, expires_at) VALUES (?, ?)`;
+    // expiresAt 应该是从 JWT 中解析出来的失效时间
+    return await db.query(sql, [token, expiresAt]);
+};
+
+/**
+ * 检查 Token 是否在黑名单中
+ */
+exports.isTokenBlacklisted = async (token) => {
+    const sql = `SELECT id FROM token_blacklist WHERE token = ? LIMIT 1`;
+    const result = await db.query(sql, [token]);
+    return result.length > 0;
+};
