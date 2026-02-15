@@ -50,12 +50,27 @@ const userData = ref(JSON.parse(localStorage.getItem('user') || '{}'));
 // 使用 computed 保证响应式
 const username = computed(() => userData.value.username || '未登录');
 // ✨ 新增：获取邮箱
-const email = computed(() => userData.value.email || '未知邮箱');
+const email = ref(userData.value.email || '未绑定邮箱');
 const role = computed(() => userData.value.role || 'user');
 
+// 封装一个获取数据的函数
+const updateLocalInfo = () => {
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  username.value = user.username || 'User';
+  role.value = user.role || 'student';
+  email.value = user.email || '未绑定';
+};
+// 监听下拉框打开动作，每次打开时都重新读一下缓存
 const toggleDropdown = () => {
+  if (!isOpen.value) {
+    updateLocalInfo(); // 打开瞬间同步最新数据
+  }
   isOpen.value = !isOpen.value;
 };
+
+onMounted(() => {
+  updateLocalInfo();
+});
 
 // 处理退出登录
 const handleLogout = async () => {
@@ -94,7 +109,10 @@ onUnmounted(() => {
 });
 
 // 模拟跳转
-const handleProfile = () => { alert('个人设置开发中...'); isOpen.value = false; };
+const handleProfile = () => {
+  isOpen.value = false;
+  router.push('/profile');
+};
 const handleHelp = () => { alert('请联系系统管理员'); isOpen.value = false; };
 </script>
 

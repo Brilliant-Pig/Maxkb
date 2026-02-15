@@ -112,3 +112,53 @@ exports.isTokenBlacklisted = async (token) => {
     const result = await db.query(sql, [token]);
     return result.length > 0;
 };
+
+// ==========================================
+// 4. 用户信息维护 (个人设置功能)
+// ==========================================
+
+/**
+ * 根据用户 ID 查找完整用户信息
+ * @param {number} userId
+ */
+exports.findUserById = async (userId) => {
+    const sql = `
+        SELECT 
+            user_id AS id, 
+            user_name AS username, 
+            email, 
+            password_hash, 
+            role 
+        FROM user_info 
+        WHERE user_id = ?
+    `;
+    return await db.query(sql, [userId]);
+};
+
+/**
+ * 更新用户密码
+ * @param {number} userId
+ * @param {string} newPasswordHash 加密后的新密码哈希
+ */
+exports.updatePassword = async (userId, newPasswordHash) => {
+    const sql = `
+        UPDATE user_info 
+        SET password_hash = ? 
+        WHERE user_id = ?
+    `;
+    return await db.query(sql, [newPasswordHash, userId]);
+};
+
+/**
+ * 更新用户邮箱
+ * @param {number} userId
+ * @param {string} newEmail
+ */
+exports.updateEmail = async (userId, newEmail) => {
+    const sql = `
+        UPDATE user_info 
+        SET email = ? 
+        WHERE user_id = ?
+    `;
+    return await db.query(sql, [newEmail, userId]);
+};
