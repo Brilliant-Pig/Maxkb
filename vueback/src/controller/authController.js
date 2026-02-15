@@ -109,3 +109,60 @@ router.post('/logout', async (req, res) => {
         res.ResultVO(1, result.msg);
     }
 });
+
+/**
+ * @name updatePassword 修改密码
+ * @description POST /auth/update-password
+ */
+router.post('/update-password', async (req, res) => {
+    const { oldPassword, newPassword } = req.body;
+
+    // 1. 从请求头提取 token 并解析出 userId
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.ResultVO(1, '未登录或凭证失效');
+
+    const token = authHeader.split(' ')[1];
+    const payload = await authService.tokenVerify(token);
+
+    if (!payload || !payload.userId) return res.ResultVO(1, '身份验证失败');
+
+    try {
+        // 2. 调用 service 执行逻辑
+        const result = await authService.updatePassword(payload.userId, oldPassword, newPassword);
+        if (result.success) {
+            res.ResultVO(0, '密码修改成功，请重新登录');
+        } else {
+            res.ResultVO(1, result.msg || '修改失败');
+        }
+    } catch (err) {
+        console.error(err);
+        res.ResultVO(1, '服务器异常');
+    }
+});
+
+/**
+ * @name updateEmail 修改邮箱
+ * @description POST /auth/update-email
+ */
+router.post('/update-email', async (req, res) => {
+    const { newEmail, password } = req.body;
+
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.ResultVO(1, '未登录');
+
+    const token = authHeader.split(' ')[1];
+    const payload = await authService.tokenVerify(token);
+
+    if (!payload) return res.ResultVO(1, '凭证无效');
+
+    try {
+        const result = await authService.updateEmail(payload.userId, newEmail, password);
+        if (result.success) {
+            res.ResultVO(0, '邮箱修改成功', { newEmail: result.newEmail });
+        } else {
+            res.ResultVO(1, result.msg || '修改失败');
+        }
+    } catch (err) {
+        res.ResultVO(1, '服务器异常');
+    }
+});

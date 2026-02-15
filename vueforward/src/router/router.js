@@ -48,6 +48,15 @@ const routes = [
             title: '学习仪表盘',
             freeAuth: false
         }
+    },
+    {
+    path: '/Profile',
+    name: 'Profile',
+    component: () => import('../page/Profile.vue'),
+    meta: { 
+        title: '个人设置', 
+        freeAuth: false 
+    } // 必须登录
     }
 ];
 

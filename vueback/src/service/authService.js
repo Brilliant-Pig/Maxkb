@@ -161,3 +161,64 @@ exports.logout = async (token) => {
         return { success: false, msg: '退出失败' };
     }
 };
+
+/**
+ * 修改密码业务逻辑
+ */
+exports.updatePassword = async (userId, oldPassword, newPassword) => {
+    // 1. 获取用户信息
+    const users = await authDao.findUserById(userId);
+    if (!users || users.length === 0) {
+        return { success: false, msg: '用户不存在' };
+    }
+
+    const user = users[0];
+
+    // 2. 验证旧密码是否正确 (比对明文和数据库里的哈希值)
+    const isMatch = await bcrypt.compare(oldPassword, user.password_hash);
+    if (!isMatch) {
+        return { success: false, msg: '原密码输入错误' };
+    }
+
+    // 3. 加密新密码 (加盐处理)
+    const salt = await bcrypt.genSalt(10);
+    const newPasswordHash = await bcrypt.hash(newPassword, salt);
+
+    // 4. 更新数据库
+    await authDao.updatePassword(userId, newPasswordHash);
+
+    return { success: true, msg: '密码修改成功' };
+};
+
+/**
+ * 修改邮箱业务逻辑
+ */
+exports.updateEmail = async (userId, newEmail, password) => {
+    // 1. 获取用户信息用于身份验证
+    const users = await authDao.findUserById(userId);
+    if (!users || users.length === 0) {
+        return { success: false, msg: '用户不存在' };
+    }
+
+    const user = users[0];
+
+    // 2. 验证身份：修改邮箱是敏感操作，必须验证密码
+    const isMatch = await bcrypt.compare(password, user.password_hash);
+    if (!isMatch) {
+        return { success: false, msg: '身份验证失败，密码错误' };
+    }
+
+    // 3. 检查新邮箱是否已被注册
+    const existingUser = await authDao.findUserByEmail(newEmail);
+    if (existingUser && existingUser.length > 0) {
+        // 如果查出来的 ID 不是当前用户，说明被别人占用了
+        if (existingUser[0].id !== userId) {
+            return { success: false, msg: '该邮箱已被其他账号占用' };
+        }
+    }
+
+    // 4. 执行更新
+    await authDao.updateEmail(userId, newEmail);
+
+    return { success: true, msg: '邮箱修改成功', newEmail };
+};
