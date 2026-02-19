@@ -1,0 +1,4 @@
+2026-02-14 10:51:35 [log WARNING] Unauthorized: /admin/api/user/profile
+2026-02-14 17:10:44 [log WARNING] Not Found: /chat/api/019c525e-7671-7c63-9d84-20b12fc1574e
+2026-02-14 17:11:00 [log WARNING] Not Found: /chat/api/019c525e-7671-7c63-9d84-20b12fc1574e
+2026-02-14 17:11:02 [log WARNING] Not Found: /chat/api/019c525e-7671-7c63-9d84-20b12fc1574e
