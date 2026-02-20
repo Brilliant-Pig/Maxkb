@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="lab-container">
     <header class="lab-header animate__animated animate__fadeIn">
       <div class="logo-area">
@@ -85,7 +85,7 @@ import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 
 const router = useRouter();
-const maxkbUrl = ref("http://localhost:8090/chat/76725bd7865fb550");
+const maxkbUrl = ref("http://localhost:8090/chat/74b3dfb549785c69");
 const iframeLoading = ref(true);
 const showTip = ref(false);
 
