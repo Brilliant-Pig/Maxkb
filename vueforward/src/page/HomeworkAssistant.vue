@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="homework-container">
     <nav class="hw-nav animate__animated animate__fadeIn">
       <div class="nav-brand">
@@ -128,15 +128,40 @@ const submitForAudit = async () => {
     - [优化建议1]`;
 
     // 真实调用 MaxKB API (根据你的 token 和地址)
-    const response = await fetch('http://localhost:8090/api/application/chat/76725bd7865fb550/chat', {
+    const chatIdResponse = await fetch('http://localhost:8090/chat/api/open', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer application-bb3982ea3ad34a8264a5ac2f7ce2b78b'
+      }
+    });
+    
+    if (!chatIdResponse.ok) {
+      throw new Error(`获取会话ID失败: ${chatIdResponse.status}`);
+    }
+    
+    const chatIdData = await chatIdResponse.json();
+    const chatId = chatIdData.data || chatIdData.id || '';
+    
+    console.log('获取到的会话 ID:', chatId);
+    
+    if (!chatId) {
+      throw new Error('无法获取会话 ID');
+    }
+    
+    const response = await fetch(`http://localhost:8090/chat/api/chat_message/${chatId}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer 76725bd7865fb550' // 假设你的Token也是这个，如果不是请替换
+        'Authorization': 'Bearer application-bb3982ea3ad34a8264a5ac2f7ce2b78b'
       },
-      body: JSON.stringify({ message: fullPrompt, re_chat: true })
+      body: JSON.stringify({ 
+        message: fullPrompt,
+        stream: false,
+        re_chat: true
+      })
     });
-
+    
     const data = await response.json();
     const aiReply = data.data?.content || "";
     
@@ -145,7 +170,7 @@ const submitForAudit = async () => {
 
   } catch (error) {
     console.error("AI 批改请求失败:", error);
-    alert("本地推理节点连接失败，请检查 MaxKB 服务状态。");
+    // alert 已删除
   } finally {
     isSubmitting.value = false;
   }
@@ -153,24 +178,61 @@ const submitForAudit = async () => {
 
 // 解析 AI 回复函数
 const parseAIResult = (text) => {
+  console.log('AI 原始返回内容:', text);
+  
+  // 尝试从内容中提取分数
+  let score = 70;
+  
+  // 方法1: 尝试匹配标准格式 "SCORE: 数字"
   const scoreMatch = text.match(/SCORE:\s*(\d+)/);
-  const score = scoreMatch ? parseInt(scoreMatch[1]) : 70;
+  if (scoreMatch) {
+    score = parseInt(scoreMatch[1]);
+  } else {
+    // 方法2: 尝试从内容中查找数字分数
+    const numberMatch = text.match(/(\d{1,3})分|分数[:：]\s*(\d{1,3})|评分[:：]\s*(\d{1,3})/);
+    if (numberMatch) {
+      score = parseInt(numberMatch[1] || numberMatch[2] || numberMatch[3]);
+    }
+  }
+  
+  console.log('提取到的分数:', score);
   
   const details = [];
-  // 简单正则提取错误和建议
+  
+  // 尝试提取建议
   const lines = text.split('\n');
   let currentType = 'info';
+  
   lines.forEach(line => {
-    if (line.includes('ERRORS:')) currentType = 'error';
-    if (line.includes('SUGGESTIONS:')) currentType = 'info';
-    if (line.startsWith('-')) {
-      details.push({ type: currentType, text: line.replace('-', '').trim() });
+    const trimmedLine = line.trim();
+    
+    if (trimmedLine.includes('ERRORS:') || trimmedLine.includes('错误') || trimmedLine.includes('问题')) {
+      currentType = 'error';
+    } else if (trimmedLine.includes('SUGGESTIONS:') || trimmedLine.includes('建议') || trimmedLine.includes('优化')) {
+      currentType = 'info';
+    }
+    
+    // 提取以 -、•、数字开头的列表项
+    if (trimmedLine.startsWith('-') || trimmedLine.startsWith('•') || /^\d+\./.test(trimmedLine)) {
+      details.push({ 
+        type: currentType, 
+        text: trimmedLine.replace(/^[-•]\s*/, '').replace(/^\d+\.\s*/, '').trim() 
+      });
     }
   });
 
+  // 如果没有提取到详细内容，使用整个回复
+  if (details.length === 0 && text.length > 10) {
+    // 简单分段
+    const sentences = text.split(/[。！？\n]/).filter(s => s.trim().length > 5);
+    sentences.forEach(sentence => {
+      details.push({ type: 'info', text: sentence.trim() });
+    });
+  }
+
   diagnosticResult.value = {
     score: score,
-    details: details.length > 0 ? details : [{ type: 'info', text: '逻辑基本正确，暂无明显错误。' }]
+    details: details.length > 0 ? details : [{ type: 'info', text: text.substring(0, 200) + '...' }]
   };
 
   // --- 同步到教师端真实日志 ---
